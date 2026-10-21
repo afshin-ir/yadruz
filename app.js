@@ -74,7 +74,7 @@ function upcomingText(r){const n=daysUntil(r);return n===0?'امروز':n===1?'�
 function make(tag,cls,txt){const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=txt;return el}
 function rowFor(r){
  const tr=make('tr');
- const name=make('td','name-cell');name.append(make('strong','',r.name));
+ const name=make('td','name-cell sticky-name');name.append(make('strong','',r.name));
  if(r.note){const note=make('small','row-note',r.note);note.title=r.note;name.append(note)}
  const date=make('td','date-cell',eventDate(r));
  const elapsed=make('td','',r.kind==='death'?elapsedText(r):`${fa(Math.max(0,elapsedYears(r)))} سال`);
@@ -83,7 +83,9 @@ function rowFor(r){
  if(tab==='death')tr.append(make('td','burial-cell',persianDigits(r.burial||'—')));
  if(tab==='upcoming')tr.append(make('td','',r.kind==='birth'?'🎂 تولد':'🕊 یادبود'));
  const action=make('td','row-actions'),wrap=make('div','table-actions');
- const edit=make('button','table-edit','ویرایش'),del=make('button','table-delete','حذف');
+ const edit=make('button','table-edit'),del=make('button','table-delete');
+ edit.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L9 17l-4 1 1-4Z"/></svg><span>ویرایش</span>';
+ del.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg><span>حذف</span>';
  edit.type=del.type='button';edit.setAttribute('aria-label',`ویرایش ${r.name}`);del.setAttribute('aria-label',`حذف ${r.name}`);
  edit.onclick=()=>openEditor(r);del.onclick=()=>{if(confirm(`«${r.name}» حذف شود؟`))save(records.filter(x=>x.id!==r.id))};
  wrap.append(edit,del);action.append(wrap);tr.append(action);return tr;
@@ -95,9 +97,9 @@ function showTable(arr){
  const keys=['name','date','elapsed'];if(tab!=='death')keys.push('next');
  if(tab==='death')keys.push('burial');if(tab==='upcoming')keys.push('kind');keys.push(null);
  columns.forEach((label,i)=>{
-  const th=make('th');const key=keys[i];
+  const th=make('th');const key=keys[i];if(key==='name')th.classList.add('sticky-name');
   if(key){
-   const button=make('button','sort-heading');button.type='button';
+   const button=make('button','sort-heading');button.type='button';if(tableSort[tab]?.key===key)button.classList.add('heading-active');
    const title=make('span','',label),arrows=make('span','sort-arrows');
    const active=tableSort[tab];
    arrows.append(make('span',active?.key===key&&active.dir==='asc'?'sort-active':'','▲'),make('span',active?.key===key&&active.dir==='desc'?'sort-active':'','▼'));
@@ -115,7 +117,7 @@ function render(){const soon=records.filter(r=>daysUntil(r)<=30);$('birthCount')
   const c=compareSort(a,b,key)*(dir==='asc'?1:-1);
   return c||faCollator.compare(a.name,b.name)||a.id.localeCompare(b.id);
  });
- }$('cards').replaceChildren();if(!arr.length){const empty=make('div','empty');empty.append(make('div','', '🌱'),make('strong','',query?'نتیجه‌ای پیدا نشد':tab==='upcoming'?'مناسبتی در سی روز آینده نیست':'هنوز اطلاعاتی ثبت نشده است'),make('p','',query?'عبارت دیگری را جست‌وجو کن.':'برای شروع، از دکمهٔ افزودن شخص استفاده کن.'));$('cards').append(empty)}else $('cards').append(showTable(arr))}
+ }$('cards').replaceChildren();if(!arr.length){const empty=make('div','empty');empty.append(make('div','empty-icon',query?'⌕':tab==='death'?'🕊':tab==='birth'?'🎂':'🌱'),make('strong','',query?'نتیجه‌ای پیدا نشد':tab==='upcoming'?'مناسبتی در سی روز آینده نیست':'هنوز اطلاعاتی ثبت نشده است'),make('p','',query?'عبارت دیگری را جست‌وجو کن.':tab==='upcoming'?'رویدادهای نزدیک پس از ثبت تولدها و یادبودها نمایش داده می‌شوند.':'اولین مورد را ثبت کن تا فهرستت شکل بگیرد.'));if(!query){const start=make('button','primary empty-add','＋ افزودن شخص');start.type='button';start.onclick=()=>openEditor();empty.append(start)}$('cards').append(empty)}else $('cards').append(showTable(arr))}
 function openEditor(r=null){editId=r?.id||null;$('entryForm').reset();$('formError').textContent='';$('dialogTitle').textContent=r?'ویرایش اطلاعات':'افزودن شخص';$('kind').value=r?.kind||(tab==='death'?'death':'birth');$('name').value=r?.name||'';$('day').value=r?.day||'';$('month').value=r?.month||1;$('year').value=r?.year||'';$('burial').value=r?.burial||'';$('note').value=r?.note||'';toggleBurial();$('editor').showModal();$('name').focus()}
 function toggleBurial(){$('burialWrap').hidden=$('kind').value!=='death'}
 $('month').replaceChildren(...months.map((name,i)=>{const o=make('option','',name);o.value=i+1;return o}));
