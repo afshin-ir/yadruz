@@ -15,7 +15,28 @@ function toGregorian(y,m,d){ // Find exact Persian date using the platform calen
 function validDate(y,m,d){return Number.isInteger(y)&&y>=1&&y<=1600&&Number.isInteger(m)&&m>=1&&m<=12&&Number.isInteger(d)&&d>=1&&d<=31&&!!toGregorian(y,m,d)}
 function todayJ(){return jalali(new Date())}
 function daysUntil(rec){const t=todayJ();const start=Date.UTC(new Date().getFullYear(),new Date().getMonth(),new Date().getDate(),12);for(let y=t.y;y<=t.y+2;y++){const date=toGregorian(y,rec.month,rec.day);if(date){const diff=Math.round((date.getTime()-start)/86400000);if(diff>=0)return diff}}return Infinity}
-function elapsedYears(rec){const t=todayJ();return t.y-rec.year-((t.m<rec.month||(t.m===rec.month&&t.d<rec.day))?1:0)}
+function elapsedParts(rec){
+ const now=new Date(), end=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate(),12));
+ const start=toGregorian(rec.year,rec.month,rec.day);
+ if(!start||start>end)return null;
+ const t=jalali(end);
+ let years=t.y-rec.year, months=t.m-rec.month, days=t.d-rec.day;
+ if(days<0){let previousMonth=t.m-1,previousYear=t.y;if(previousMonth===0){previousMonth=12;previousYear--}
+  const previousMonthEnd=toGregorian(previousYear,previousMonth+1,1)||toGregorian(previousYear+1,1,1);
+  const lastDay=new Date(previousMonthEnd.getTime()-86400000);
+  days+=jalali(lastDay).d;months--;
+ }
+ if(months<0){months+=12;years--}
+ return {years,months,days};
+}
+function elapsedText(rec){const e=elapsedParts(rec);if(!e)return '—';const parts=[];
+ if(e.years)parts.push(`${fa(e.years)} سال`);
+ if(e.months)parts.push(`${fa(e.months)} ماه`);
+ if(e.days)parts.push(`${fa(e.days)} روز`);
+ return parts.join(' و ')||'امروز';
+}
+function elapsedYears(rec){return elapsedParts(rec)?.years??0}
+function persianDigits(value){return String(value).replace(/[0-9٠-٩]/g,c=>c>='0'&&c<='9'?String.fromCharCode(c.charCodeAt(0)+1728):String.fromCharCode(c.charCodeAt(0)+144))}
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a.filter(validate):[]}catch{return []}}
 function validate(r){return !!r&&typeof r.id==='string'&&r.id.length<=100&&['birth','death'].includes(r.kind)&&typeof r.name==='string'&&r.name.trim().length>0&&r.name.length<=120&&validDate(r.year,r.month,r.day)&&typeof r.burial==='string'&&r.burial.length<=180&&typeof r.note==='string'&&r.note.length<=1000}
 let records=load(),tab='upcoming',editId=null;
@@ -28,10 +49,10 @@ function rowFor(r){
  const name=make('td','name-cell');name.append(make('strong','',r.name));
  if(r.note){const note=make('small','row-note',r.note);note.title=r.note;name.append(note)}
  const date=make('td','date-cell',eventDate(r));
- const elapsed=make('td','',`${fa(Math.max(0,elapsedYears(r)))} سال`);
+ const elapsed=make('td','',r.kind==='death'?elapsedText(r):`${fa(Math.max(0,elapsedYears(r)))} سال`);
  const next=make('td','',upcomingText(r));
- tr.append(name,date,elapsed,next);
- if(tab==='death')tr.append(make('td','burial-cell',r.burial||'—'));
+ tr.append(name,date,elapsed);if(tab!=='death')tr.append(next);
+ if(tab==='death')tr.append(make('td','burial-cell',persianDigits(r.burial||'—')));
  if(tab==='upcoming')tr.append(make('td','',r.kind==='birth'?'🎂 تولد':'🕊 یادبود'));
  const action=make('td','row-actions'),wrap=make('div','table-actions');
  const edit=make('button','table-edit','ویرایش'),del=make('button','table-delete','حذف');
@@ -41,7 +62,7 @@ function rowFor(r){
 }
 function showTable(arr){
  const wrap=make('div','table-scroll'),table=make('table','records-table'),thead=make('thead'),head=make('tr');
- const columns=['نام','تاریخ '+(tab==='death'?'وفات':tab==='birth'?'تولد':'رویداد'),'مدت سپری‌شده','مناسبت بعدی'];
+ const columns=['نام','تاریخ '+(tab==='death'?'وفات':tab==='birth'?'تولد':'رویداد'),tab==='birth'?'سن':tab==='death'?'مدت سپری‌شده از وفات':'مدت سپری‌شده'];if(tab!=='death')columns.push(tab==='birth'?'تولد بعدی':'مناسبت بعدی');
  if(tab==='death')columns.push('محل دفن');if(tab==='upcoming')columns.push('نوع');columns.push('عملیات');
  columns.forEach(label=>head.append(make('th','',label)));thead.append(head);
  const tbody=make('tbody');arr.forEach(r=>tbody.append(rowFor(r)));table.append(thead,tbody);wrap.append(table);return wrap;
