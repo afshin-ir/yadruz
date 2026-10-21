@@ -11,7 +11,7 @@
   &nbsp; · &nbsp;
   <a href="https://github.com/afshin-ir/yadruz">💻 کد منبع</a>
   &nbsp; · &nbsp;
-  <a href="LICENSE">📜 مجوز MIT</a>
+  <a href="LICENSE">📜 مجوز AGPLv3</a>
 </p>
 
 ---
@@ -128,7 +128,7 @@ yadruz-backup 1405-07-29.json
 
 ## 📜 مجوز
 
-این پروژه با مجوز **MIT** منتشر شده است. متن کامل را در فایل [LICENSE](LICENSE) بخوانید.
+این پروژه با مجوز **GNU AGPLv3** منتشر شده است. متن کامل را در فایل [LICENSE](LICENSE) بخوانید.
 
 ---
 
