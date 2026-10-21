@@ -22,3 +22,10 @@ html,body,button,input,select,textarea,dialog,option{font-family:"Vazirmatn",Tah
 .table-actions .table-delete{color:#aa5c58}
 .table-actions button:hover{background:var(--accent-soft)}
 @media(max-width:700px){.records-table{min-width:750px}.records-table th,.records-table td{padding:12px 11px}}
+
+/* Sortable table headers */
+.records-table .sort-heading{display:inline-flex;align-items:center;gap:9px;direction:rtl;text-align:right;border:0;padding:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;cursor:pointer;white-space:nowrap}
+.records-table .sort-heading:hover{color:var(--ink)}
+.records-table .sort-arrows{display:inline-flex;flex-direction:column;justify-content:center;gap:0;line-height:1;font-size:.61rem;color:var(--muted);opacity:.7}
+.records-table .sort-arrows .sort-active{color:#239568;opacity:1;font-weight:900}
+.records-table th[aria-sort="ascending"] .sort-arrows,.records-table th[aria-sort="descending"] .sort-arrows{opacity:1}

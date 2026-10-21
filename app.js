@@ -40,6 +40,31 @@ function persianDigits(value){return String(value).replace(/[0-9٠-٩]/g,c=>c>='
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a.filter(validate):[]}catch{return []}}
 function validate(r){return !!r&&typeof r.id==='string'&&r.id.length<=100&&['birth','death'].includes(r.kind)&&typeof r.name==='string'&&r.name.trim().length>0&&r.name.length<=120&&validDate(r.year,r.month,r.day)&&typeof r.burial==='string'&&r.burial.length<=180&&typeof r.note==='string'&&r.note.length<=1000}
 let records=load(),tab='upcoming',editId=null;
+// Sorting is view-specific and never changes the stored order.
+const tableSort={upcoming:null,birth:null,death:null};
+const faCollator=new Intl.Collator('fa',{numeric:true,sensitivity:'base'});
+const dateNumber=r=>r.year*10000+r.month*100+r.day;
+function sortValue(r,key){
+ switch(key){
+  case 'name':return r.name;
+  case 'date':return dateNumber(r);
+  case 'elapsed':return dateNumber(r); // Earlier dates have longer elapsed durations.
+  case 'next':return daysUntil(r);
+  case 'burial':return r.burial||'';
+  case 'kind':return r.kind==='birth'?'تولد':'یادبود';
+  default:return 0;
+ }
+}
+function compareSort(a,b,key){
+ const x=sortValue(a,key),y=sortValue(b,key);
+ return typeof x==='string'?faCollator.compare(x,y):x-y;
+}
+function setTableSort(key){
+ const old=tableSort[tab];
+ tableSort[tab]={key,dir:old?.key===key&&old.dir==='asc'?'desc':'asc'};
+ render();
+}
+
 function save(next){try{localStorage.setItem(KEY,JSON.stringify(next));records=next;render();return true}catch{alert('ذخیره‌سازی مرورگر در دسترس نیست یا فضای آن پر شده است.');return false}}
 function eventDate(r){return `${fa(r.day)} ${months[r.month-1]} ${fa(r.year)}`}
 function upcomingText(r){const n=daysUntil(r);return n===0?'امروز':n===1?'فردا':`${fa(n)} روز دیگر`}
@@ -64,10 +89,30 @@ function showTable(arr){
  const wrap=make('div','table-scroll'),table=make('table','records-table'),thead=make('thead'),head=make('tr');
  const columns=['نام','تاریخ '+(tab==='death'?'وفات':tab==='birth'?'تولد':'رویداد'),tab==='birth'?'سن':tab==='death'?'مدت سپری‌شده از وفات':'مدت سپری‌شده'];if(tab!=='death')columns.push(tab==='birth'?'تولد بعدی':'مناسبت بعدی');
  if(tab==='death')columns.push('محل دفن');if(tab==='upcoming')columns.push('نوع');columns.push('عملیات');
- columns.forEach(label=>head.append(make('th','',label)));thead.append(head);
+ const keys=['name','date','elapsed'];if(tab!=='death')keys.push('next');
+ if(tab==='death')keys.push('burial');if(tab==='upcoming')keys.push('kind');keys.push(null);
+ columns.forEach((label,i)=>{
+  const th=make('th');const key=keys[i];
+  if(key){
+   const button=make('button','sort-heading');button.type='button';
+   const title=make('span','',label),arrows=make('span','sort-arrows');
+   const active=tableSort[tab];
+   arrows.append(make('span',active?.key===key&&active.dir==='asc'?'sort-active':'','▲'),make('span',active?.key===key&&active.dir==='desc'?'sort-active':'','▼'));
+   button.append(title,arrows);button.onclick=()=>setTableSort(key);
+   button.setAttribute('aria-label',`مرتب‌سازی بر اساس ${label}؛ ${active?.key===key?(active.dir==='asc'?'صعودی':'نزولی'):'برای مرتب‌سازی کلیک کنید'}`);
+   th.setAttribute('aria-sort',active?.key===key?(active.dir==='asc'?'ascending':'descending'):'none');th.append(button);
+  }else th.textContent=label;
+  head.append(th);
+ });thead.append(head);
  const tbody=make('tbody');arr.forEach(r=>tbody.append(rowFor(r)));table.append(thead,tbody);wrap.append(table);return wrap;
 }
-function render(){const soon=records.filter(r=>daysUntil(r)<=30);$('birthCount').textContent=fa(records.filter(r=>r.kind==='birth').length);$('deathCount').textContent=fa(records.filter(r=>r.kind==='death').length);$('soonCount').textContent=fa(soon.length);const t=todayJ();$('today').textContent=`امروز\n${fa(t.d)} ${months[t.m-1]} ${fa(t.y)}`;$('today').style.whiteSpace='pre-line';document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('listing').hidden=tab==='settings';$('settings').hidden=tab!=='settings';if(tab==='settings')return;const labels={upcoming:['رویدادهای نزدیک','در سی روز آینده'],birth:['تولدها','فهرست تولدهای ثبت‌شده'],death:['یادبودها','فهرست درگذشتگان']};$('sectionTitle').textContent=labels[tab][0];$('sectionSubtitle').textContent=labels[tab][1];$('add').textContent=tab==='death'?'＋ افزودن یادبود':'＋ افزودن شخص';let arr=records.filter(r=>tab==='upcoming'?daysUntil(r)<=30:r.kind===tab);const query=$('search').value.trim().toLocaleLowerCase('fa');if(query)arr=arr.filter(r=>(r.name+' '+r.burial+' '+r.note).toLocaleLowerCase('fa').includes(query));const sort=$('sort').value;arr.sort((a,b)=>tab==='death' ? (b.year-a.year || b.month-a.month || b.day-a.day || a.name.localeCompare(b.name,'fa')) : sort==='name'?a.name.localeCompare(b.name,'fa'):sort==='date'?(a.year-b.year||a.month-b.month||a.day-b.day):daysUntil(a)-daysUntil(b));$('cards').replaceChildren();if(!arr.length){const empty=make('div','empty');empty.append(make('div','', '🌱'),make('strong','',query?'نتیجه‌ای پیدا نشد':tab==='upcoming'?'مناسبتی در سی روز آینده نیست':'هنوز اطلاعاتی ثبت نشده است'),make('p','',query?'عبارت دیگری را جست‌وجو کن.':'برای شروع، از دکمهٔ افزودن شخص استفاده کن.'));$('cards').append(empty)}else $('cards').append(showTable(arr))}
+function render(){const soon=records.filter(r=>daysUntil(r)<=30);$('birthCount').textContent=fa(records.filter(r=>r.kind==='birth').length);$('deathCount').textContent=fa(records.filter(r=>r.kind==='death').length);$('soonCount').textContent=fa(soon.length);const t=todayJ();$('today').textContent=`امروز\n${fa(t.d)} ${months[t.m-1]} ${fa(t.y)}`;$('today').style.whiteSpace='pre-line';document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('listing').hidden=tab==='settings';$('settings').hidden=tab!=='settings';if(tab==='settings')return;const labels={upcoming:['رویدادهای نزدیک','در سی روز آینده'],birth:['تولدها','فهرست تولدهای ثبت‌شده'],death:['یادبودها','فهرست درگذشتگان']};$('sectionTitle').textContent=labels[tab][0];$('sectionSubtitle').textContent=labels[tab][1];$('add').textContent=tab==='death'?'＋ افزودن یادبود':'＋ افزودن شخص';let arr=records.filter(r=>tab==='upcoming'?daysUntil(r)<=30:r.kind===tab);const query=$('search').value.trim().toLocaleLowerCase('fa');if(query)arr=arr.filter(r=>(r.name+' '+r.burial+' '+r.note).toLocaleLowerCase('fa').includes(query));const sort=$('sort').value;arr.sort((a,b)=>tab==='death' ? (b.year-a.year || b.month-a.month || b.day-a.day || a.name.localeCompare(b.name,'fa')) : sort==='name'?a.name.localeCompare(b.name,'fa'):sort==='date'?(a.year-b.year||a.month-b.month||a.day-b.day):daysUntil(a)-daysUntil(b));if(tableSort[tab]){
+ const {key,dir}=tableSort[tab];
+ arr.sort((a,b)=>{
+  const c=compareSort(a,b,key)*(dir==='asc'?1:-1);
+  return c||faCollator.compare(a.name,b.name)||a.id.localeCompare(b.id);
+ });
+ }$('cards').replaceChildren();if(!arr.length){const empty=make('div','empty');empty.append(make('div','', '🌱'),make('strong','',query?'نتیجه‌ای پیدا نشد':tab==='upcoming'?'مناسبتی در سی روز آینده نیست':'هنوز اطلاعاتی ثبت نشده است'),make('p','',query?'عبارت دیگری را جست‌وجو کن.':'برای شروع، از دکمهٔ افزودن شخص استفاده کن.'));$('cards').append(empty)}else $('cards').append(showTable(arr))}
 function openEditor(r=null){editId=r?.id||null;$('entryForm').reset();$('formError').textContent='';$('dialogTitle').textContent=r?'ویرایش اطلاعات':'افزودن شخص';$('kind').value=r?.kind||(tab==='death'?'death':'birth');$('name').value=r?.name||'';$('day').value=r?.day||'';$('month').value=r?.month||1;$('year').value=r?.year||'';$('burial').value=r?.burial||'';$('note').value=r?.note||'';toggleBurial();$('editor').showModal();$('name').focus()}
 function toggleBurial(){$('burialWrap').hidden=$('kind').value!=='death'}
 $('month').replaceChildren(...months.map((name,i)=>{const o=make('option','',name);o.value=i+1;return o}));
