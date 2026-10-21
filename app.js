@@ -1,6 +1,6 @@
 'use strict';
 // No external requests, tracking, or embedded personal records.
-const KEY='yadruz.records.v1',THEME='yadruz.theme.v1';
+const KEY='yadruz.records.v1',THEME='yadruz.theme.v1',LAST_TAB='yadruz.lastTab.v1';
 const months=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
 const $=id=>document.getElementById(id), fa=n=>new Intl.NumberFormat('fa-IR',{useGrouping:false}).format(n);
 const fmt=new Intl.DateTimeFormat('en-US-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'});
@@ -39,7 +39,10 @@ function elapsedYears(rec){return elapsedParts(rec)?.years??0}
 function persianDigits(value){return String(value).replace(/[0-9٠-٩]/g,c=>c>='0'&&c<='9'?String.fromCharCode(c.charCodeAt(0)+1728):String.fromCharCode(c.charCodeAt(0)+144))}
 function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a.filter(validate):[]}catch{return []}}
 function validate(r){return !!r&&typeof r.id==='string'&&r.id.length<=100&&['birth','death'].includes(r.kind)&&typeof r.name==='string'&&r.name.trim().length>0&&r.name.length<=120&&validDate(r.year,r.month,r.day)&&typeof r.burial==='string'&&r.burial.length<=180&&typeof r.note==='string'&&r.note.length<=1000}
-let records=load(),tab='upcoming',editId=null;
+const validTabs=['upcoming','birth','death','settings'];
+function rememberedTab(){try{const value=localStorage.getItem(LAST_TAB);return validTabs.includes(value)?value:'upcoming'}catch{return 'upcoming'}}
+function setTab(next){if(!validTabs.includes(next))return;tab=next;try{localStorage.setItem(LAST_TAB,next)}catch{}render()}
+let records=load(),tab=rememberedTab(),editId=null;
 // Sorting is view-specific and never changes the stored order.
 const tableSort={upcoming:null,birth:null,death:null};
 const faCollator=new Intl.Collator('fa',{numeric:true,sensitivity:'base'});
@@ -118,7 +121,7 @@ function toggleBurial(){$('burialWrap').hidden=$('kind').value!=='death'}
 $('month').replaceChildren(...months.map((name,i)=>{const o=make('option','',name);o.value=i+1;return o}));
 $('kind').addEventListener('change',toggleBurial);$('add').onclick=()=>openEditor();$('close').onclick=$('cancel').onclick=()=>$('editor').close();
 $('entryForm').onsubmit=e=>{e.preventDefault();const y=Number($('year').value),m=Number($('month').value),d=Number($('day').value);if(!validDate(y,m,d)){$('formError').textContent='تاریخ هجری شمسی معتبر نیست.';return}const r={id:editId||((globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random()}`),kind:$('kind').value,name:$('name').value.trim(),year:y,month:m,day:d,burial:$('kind').value==='death'?$('burial').value.trim():'',note:$('note').value.trim()};if(!validate(r)){$('formError').textContent='لطفاً اطلاعات را بررسی کن.';return}if(save(editId?records.map(x=>x.id===editId?r:x):[...records,r]))$('editor').close()};
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});$('search').oninput=render;$('sort').onchange=render;
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));$('search').oninput=render;$('sort').onchange=render;
 $('theme').onclick=()=>{const dark=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',dark);localStorage.setItem(THEME,dark?'dark':'light');$('theme').textContent=dark?'☀ حالت روشن':'☾ حالت تاریک'};
 if(localStorage.getItem(THEME)==='dark'){document.documentElement.classList.add('dark');$('theme').textContent='☀ حالت روشن'}
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'yadruz-backup',version:1,records},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;const j=todayJ();const stamp=[j.y,j.m,j.d].map((v,i)=>i===0?String(v):String(v).padStart(2,'0')).join('-');a.download=`yadruz-backup ${stamp}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
@@ -137,6 +140,6 @@ $('sheetImport').onchange=async e=>{
   const known=new Set(records.map(signature)),fresh=[];let duplicates=0;
   for(const r of results){const key=signature(r);if(known.has(key)){duplicates++;continue}known.add(key);r.id=(globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`);fresh.push(r)}
   const summary=`نوع: ${kind==='birth'?'تولد':'وفات'}\nرکوردهای خوانده‌شده: ${fa(results.length)}\nرکوردهای جدید: ${fa(fresh.length)}\nتکراری: ${fa(duplicates)}\nردیف‌های کنارگذاشته‌شده: ${fa(skipped.length)}${skipped.length?'\nنمونهٔ خطاها:\n'+skipped.slice(0,5).join('\n'):''}\n\nآیا رکوردهای جدید به اطلاعات فعلی اضافه شوند؟`;
-  if(confirm(summary)&&fresh.length){if(save([...records,...fresh])){tab=kind;render();alert(`${fa(fresh.length)} رکورد اضافه شد.`)}}
+  if(confirm(summary)&&fresh.length){if(save([...records,...fresh])){setTab(kind);alert(`${fa(fresh.length)} رکورد اضافه شد.`)}}
  }catch(err){alert(`ورود فایل انجام نشد: ${err.message||'خطای ناشناخته'}`)}finally{e.target.value=''}
 };
