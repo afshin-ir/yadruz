@@ -37,3 +37,18 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'yadruz-bac
 $('import').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>5_000_000)throw Error('فایل بیش از حد بزرگ است.');const data=JSON.parse(await file.text());if(data.format!=='yadruz-backup'||data.version!==1||!Array.isArray(data.records)||data.records.length>20000||!data.records.every(validate)||new Set(data.records.map(x=>x.id)).size!==data.records.length)throw Error('ساختار فایل پشتیبان معتبر نیست.');if(confirm(`آیا ${fa(data.records.length)} رکورد جایگزین تمام اطلاعات فعلی شود؟`))save(data.records)}catch(err){alert(err.message||'خواندن فایل ممکن نشد.')}finally{e.target.value=''}};
 $('clear').onclick=()=>{if(confirm('تمام اطلاعات این مرورگر پاک شوند؟ این کار برگشت‌پذیر نیست.')&&confirm('برای تأیید نهایی، دوباره تأیید کن.'))save([])};
 render();
+
+// Import spreadsheet rows without uploading them anywhere.
+$('sheetImport').onchange=async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{
+  const rows=await SpreadsheetImport.read(file);
+  const {results,skipped,kind}=SpreadsheetImport.convert(rows,file.name,validDate);
+  if(!results.length)throw Error('هیچ رکورد دارای تاریخ شمسی معتبر در فایل پیدا نشد.');
+  const signature=r=>[r.kind,r.name.replace(/\s+/g,' ').trim().replace(/ي/g,'ی').replace(/ك/g,'ک'),r.year,r.month,r.day].join('|');
+  const known=new Set(records.map(signature)),fresh=[];let duplicates=0;
+  for(const r of results){const key=signature(r);if(known.has(key)){duplicates++;continue}known.add(key);r.id=(globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`);fresh.push(r)}
+  const summary=`نوع: ${kind==='birth'?'تولد':'وفات'}\nرکوردهای خوانده‌شده: ${fa(results.length)}\nرکوردهای جدید: ${fa(fresh.length)}\nتکراری: ${fa(duplicates)}\nردیف‌های کنارگذاشته‌شده: ${fa(skipped.length)}${skipped.length?'\nنمونهٔ خطاها:\n'+skipped.slice(0,5).join('\n'):''}\n\nآیا رکوردهای جدید به اطلاعات فعلی اضافه شوند؟`;
+  if(confirm(summary)&&fresh.length){if(save([...records,...fresh])){tab=kind;render();alert(`${fa(fresh.length)} رکورد اضافه شد.`)}}
+ }catch(err){alert(`ورود فایل انجام نشد: ${err.message||'خطای ناشناخته'}`)}finally{e.target.value=''}
+};
